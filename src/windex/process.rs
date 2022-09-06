@@ -75,23 +75,23 @@ impl Process {
     /// Uses strings because currently only end-users will interact with this.
     ///
     /// Currently only supports 4-byte signed integers.
-    pub fn get_mem_at(&self, addr: usize) -> String {
-        let mut val: i32 = 0;
+    pub fn get_mem_at(&self, addr: usize, num_bytes: usize) -> Result<Vec<u8>, String> {
+        let mut val : Vec<u8> = vec![0; num_bytes];
         let mut bytes_read: usize = 0;
         let success = unsafe {
             windbg::ReadProcessMemory(
                 self.handle,
                 addr as _,
-                &mut val as *mut _ as _,
-                4,
+                val.as_mut_ptr() as _,
+                num_bytes,
                 &mut bytes_read,
             )
         }
         .as_bool();
-        if !success || bytes_read != 4 {
-            return "???".to_string();
+        if !success || bytes_read != num_bytes {
+            return Err("Could not read address".to_string());
         }
-        val.to_string()
+        Ok(val)
     }
 }
 
