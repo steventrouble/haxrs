@@ -2,14 +2,16 @@ use egui_extras::Size;
 
 use crate::windex::Process;
 
+/// Represents a user-input address.
 #[derive(Default)]
-pub struct Address {
+pub struct UserAddress {
     pub address: String,
 }
 
+/// A table of addresses and values, and buttons for editing them.
 #[derive(Default)]
 pub struct AddressGrid {
-    pub addresses: Vec<Address>,
+    pub addresses: Vec<UserAddress>,
 }
 
 impl AddressGrid {
@@ -32,21 +34,25 @@ impl AddressGrid {
                             ui.text_edit_singleline(&mut addr.address);
                         });
                         row.col(|ui| {
-                            let addr: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
-                            let value = if let Ok(addr) = addr {
-                                process.get_mem_at(addr)
-                            } else {
-                                "???".to_string()
-                            };
-                            ui.label(value);
+                            ui.label(get_address_value(process, addr));
                         });
                     })
                 }
             });
         if ui.button("+ Add Row").clicked() {
-            self.addresses.push(Address {
-                address: "123".to_string(),
+            self.addresses.push(UserAddress {
+                address: "".to_string(),
             });
         }
+    }
+}
+
+/// Returns the value at the given address as a string.
+fn get_address_value(process: &Process, addr: &UserAddress) -> String {
+    let addr: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
+    if let Ok(addr) = addr {
+        process.get_mem_at(addr)
+    } else {
+        "???".to_string()
     }
 }
