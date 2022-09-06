@@ -1,6 +1,6 @@
 use egui::{Color32, ScrollArea, TextEdit};
 
-use super::{Address, AddressGrid};
+use super::AddressGrid;
 use crate::windex::Process;
 
 #[derive(Default)]

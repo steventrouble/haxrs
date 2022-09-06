@@ -1,6 +1,7 @@
 use std::mem;
 use windows::Win32::Foundation as win;
 use windows::Win32::System as winsys;
+use windows::Win32::System::Diagnostics::Debug as windbg;
 use winsys::ProcessStatus;
 use winsys::Threading::{PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 
@@ -59,6 +60,7 @@ impl Process {
         return Err(format!("Got error {error}"));
     }
 
+    /// Returns the name (e.g. "example.exe") of the process.
     pub fn get_name(&self) -> String {
         const SIZE: usize = 128;
         let mut bytes: [u16; SIZE] = [0; SIZE];
@@ -68,8 +70,32 @@ impl Process {
         let path = String::from_utf16(&bytes).unwrap_or_else(|_| "UNKNOWN".to_string());
         path.split("\\").last().unwrap().to_string()
     }
+
+    /// Returns the value of the memory at the given address.
+    /// Uses strings because currently only end-users will interact with this.
+    ///
+    /// Currently only supports 4-byte signed integers.
+    pub fn get_mem_at(&self, addr: usize) -> String {
+        let mut val: i32 = 0;
+        let mut bytes_read: usize = 0;
+        let success = unsafe {
+            windbg::ReadProcessMemory(
+                self.handle,
+                addr as _,
+                &mut val as *mut _ as _,
+                4,
+                &mut bytes_read,
+            )
+        }
+        .as_bool();
+        if !success || bytes_read != 4 {
+            return "???".to_string();
+        }
+        val.to_string()
+    }
 }
 
+/// We *must* remember to close the handle when we're done.
 impl Drop for Process {
     fn drop(&mut self) {
         unsafe {
@@ -78,6 +104,7 @@ impl Drop for Process {
     }
 }
 
+/// Converts a list of PIDs into processes.
 fn to_processes(pids: Vec<u32>) -> Vec<Process> {
     pids.iter()
         .filter_map(|&pid| Process::new(pid).ok())

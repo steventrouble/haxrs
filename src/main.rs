@@ -7,4 +7,3 @@ fn main() {
         Box::new(|cc| Box::new(MainApp::new(cc))),
     );
 }
-

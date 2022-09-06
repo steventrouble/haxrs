@@ -1,4 +1,4 @@
-pub mod top_level;
 mod address_grid;
+pub mod top_level;
 
 pub use address_grid::{Address, AddressGrid};
