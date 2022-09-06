@@ -8,9 +8,18 @@ use egui_extras::{Size, TableRow};
 
 use crate::windex::Process;
 
-macro_rules! parse_bytes {
+macro_rules! from_bytes {
     ($value:expr, $tye:ty) => {
         <$tye>::from_le_bytes($value.try_into().expect("Invalid size")).to_string()
+    };
+}
+
+macro_rules! to_bytes {
+    ($value:expr, $tye:ty) => {
+        match $value.parse::<$tye>() {
+            Ok(parsed) => Ok(parsed.to_le_bytes().to_vec()),
+            _ => Err("Parse Error".to_string()),
+        }
     };
 }
 
@@ -41,14 +50,19 @@ impl DataType {
     }
 
     /// Parses the given DataType from a Vec of bytes.
-    fn parse_value(&self, value: Vec<u8>) -> String {
+    fn from_bytes(&self, value: Vec<u8>) -> String {
         let value = match *self {
-            DataType::FourBytes => {
-                parse_bytes!(value, i32)
-            }
-            DataType::EightBytes => {
-                parse_bytes!(value, i64)
-            }
+            DataType::FourBytes => from_bytes!(value, i32),
+            DataType::EightBytes => from_bytes!(value, i64),
+        };
+        value
+    }
+
+    /// Parses the given String from a Vec of bytes.
+    fn to_bytes(&self, value: &String) -> Result<Vec<u8>, String> {
+        let value = match *self {
+            DataType::FourBytes => to_bytes!(value, i32),
+            DataType::EightBytes => to_bytes!(value, i64),
         };
         value
     }
@@ -60,6 +74,7 @@ pub struct UserAddress {
     id: usize,
     pub address: String,
     pub data_type: DataType,
+    pub requested_val: String,
 }
 
 impl UserAddress {
@@ -82,13 +97,18 @@ pub struct AddressGrid {
 impl AddressGrid {
     pub fn show(self: &mut Self, ui: &mut egui::Ui, process: &Process) {
         egui_extras::TableBuilder::new(ui)
+            .resizable(true)
             .column(Size::relative(0.25).at_least(40.0))
-            .column(Size::exact(100.0))
+            .column(Size::initial(100.0).at_least(40.0))
             .column(Size::remainder().at_least(40.0))
+            .column(Size::remainder().at_least(40.0))
+            .column(Size::initial(30.0).at_least(40.0))
             .header(20.0, |mut header| {
-                header.header_col("Address");
-                header.header_col("Type");
-                header.header_col("Value");
+                header_col(&mut header, "Address");
+                header_col(&mut header, "Type");
+                header_col(&mut header, "Value");
+                header_col(&mut header, "Edit");
+                header_col(&mut header, "✔");
             })
             .body(|mut body| {
                 for addr in self.addresses.iter_mut() {
@@ -111,6 +131,14 @@ impl AddressGrid {
                         row.col(|ui| {
                             ui.label(get_address_value(process, addr));
                         });
+                        row.col(|ui| {
+                            ui.text_edit_singleline(&mut addr.requested_val);
+                        });
+                        row.col(|ui| {
+                            if ui.button("Set").clicked() {
+                                set_address_value(process, addr);
+                            }
+                        });
                     })
                 }
             });
@@ -120,28 +148,34 @@ impl AddressGrid {
     }
 }
 
-/// Allow text headers to be added with a single call.
-trait HeaderCol {
-    fn header_col(&mut self, text: impl Into<RichText>);
-}
-
-impl<'a, 'b> HeaderCol for TableRow<'a, 'b> {
-    /// Add a header column with text.
-    fn header_col(&mut self, text: impl Into<RichText>) {
-        self.col(|ui| {
-            ui.heading(text);
-        });
-    }
-}
-
 /// Returns the value at the given address as a string.
 fn get_address_value(process: &Process, addr: &UserAddress) -> String {
     let address: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
     if let Ok(address) = address {
         let mem = process.get_mem_at(address, addr.data_type.size_of());
         if let Ok(mem) = mem {
-            return addr.data_type.parse_value(mem);
+            return addr.data_type.from_bytes(mem);
         }
     }
     "???".to_string()
+}
+
+/// Set the value at the given address.
+fn set_address_value(process: &Process, addr: &UserAddress) {
+    let bytes = addr.data_type.to_bytes(&addr.requested_val);
+    let address: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
+
+    if let (Ok(bytes), Ok(address)) = (bytes, address) {
+        let result = process.set_mem_at(address, bytes);
+        if result.is_err() {
+            panic!("Error writing.")
+        }
+    }
+}
+
+/// Add a header column with text.
+fn header_col(header: &mut TableRow, text: impl Into<RichText>) {
+    header.col(|ui| {
+        ui.heading(text);
+    });
 }

@@ -2,6 +2,7 @@ use std::mem;
 use windows::Win32::Foundation as win;
 use windows::Win32::System as winsys;
 use windows::Win32::System::Diagnostics::Debug as windbg;
+use windows::Win32::System::Threading::PROCESS_VM_WRITE;
 use winsys::ProcessStatus;
 use winsys::Threading::{PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 
@@ -15,7 +16,7 @@ impl Process {
     pub fn new(pid: u32) -> Result<Process, Box<dyn std::error::Error>> {
         let handle = unsafe {
             winsys::Threading::OpenProcess(
-                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE,
                 win::BOOL::from(true),
                 pid,
             )
@@ -73,8 +74,6 @@ impl Process {
 
     /// Returns the value of the memory at the given address.
     /// Uses strings because currently only end-users will interact with this.
-    ///
-    /// Currently only supports 4-byte signed integers.
     pub fn get_mem_at(&self, addr: usize, num_bytes: usize) -> Result<Vec<u8>, String> {
         let mut val : Vec<u8> = vec![0; num_bytes];
         let mut bytes_read: usize = 0;
@@ -92,6 +91,26 @@ impl Process {
             return Err("Could not read address".to_string());
         }
         Ok(val)
+    }
+
+    /// Sets the value of the memory at the given address.
+    /// Uses strings because currently only end-users will interact with this.
+    pub fn set_mem_at(&self, addr: usize, bytes: Vec<u8>) -> Result<(), String> {
+        let mut bytes_written: usize = 0;
+        let success = unsafe {
+            windbg::WriteProcessMemory(
+                self.handle,
+                addr as _,
+                bytes.as_ptr() as _,
+                bytes.len(),
+                &mut bytes_written,
+            )
+        }
+        .as_bool();
+        if !success || bytes_written != bytes.len() {
+            return Err("Could not write address".to_string());
+        }
+        Ok(())
     }
 }
 
