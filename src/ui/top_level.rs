@@ -1,6 +1,7 @@
 use egui::{ScrollArea, TextEdit};
 
 use super::AddressGrid;
+use super::Search;
 use crate::windex::Process;
 
 /// The top-level app that shows up on startup.
@@ -8,6 +9,8 @@ use crate::windex::Process;
 pub struct MainApp {
     address_grid: AddressGrid,
     connect_menu: ConnectMenu,
+    search: Search,
+
     selected_process: Option<Process>,
 }
 
@@ -32,27 +35,39 @@ impl eframe::App for MainApp {
             ui.vertical_centered_justified(|ui| {
                 // Process chooser
                 ui.vertical_centered(|ui| {
-                    if let Some(process) = &self.selected_process {
-                        ui.label(process.get_name());
-                    } else {
-                        ui.label("Not connected");
-                    }
-                    let selected: Option<Process> = ui
-                        .menu_button("Connect to Process", |ui| self.connect_menu.menu(ui))
-                        .inner
-                        .flatten();
-                    if selected.is_some() {
-                        self.selected_process = selected;
-                    }
+                    ui.set_width(200.0);
+                    ui.horizontal(|ui| {
+                        if let Some(process) = &self.selected_process {
+                            ui.label(process.get_name());
+                        } else {
+                            ui.label("Not connected");
+                        }
+                        let selected: Option<Process> = ui
+                            .menu_button("Connect to Process", |ui| self.connect_menu.menu(ui))
+                            .inner
+                            .flatten();
+                        if selected.is_some() {
+                            self.selected_process = selected;
+                        }
+                    });
                 });
 
                 if let Some(process) = &self.selected_process {
-                    ui.separator();
-                    self.address_grid.show(ui, &process);
+                    separator(ui);
+                    self.search.show(ui);
+                    separator(ui);
+                    self.address_grid.show(ui, process);
                 }
             });
         });
     }
+}
+
+/// Add a custom styled separator.
+fn separator(ui: &mut egui::Ui) {
+    ui.add_space(8.0);
+    ui.separator();
+    ui.add_space(8.0);
 }
 
 /// A generic popup menu like the command menu in VSCode.

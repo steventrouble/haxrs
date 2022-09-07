@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use egui::RichText;
+use egui::{WidgetText};
 use egui_extras::{Size, TableRow};
 
 use crate::windex::Process;
@@ -96,6 +96,7 @@ pub struct AddressGrid {
 
 impl AddressGrid {
     pub fn show(self: &mut Self, ui: &mut egui::Ui, process: &Process) {
+        ui.heading("Address List");
         egui_extras::TableBuilder::new(ui)
             .resizable(true)
             .column(Size::relative(0.25).at_least(40.0))
@@ -174,8 +175,8 @@ fn set_address_value(process: &Process, addr: &UserAddress) {
 }
 
 /// Add a header column with text.
-fn header_col(header: &mut TableRow, text: impl Into<RichText>) {
+fn header_col(header: &mut TableRow, text: impl Into<WidgetText>) {
     header.col(|ui| {
-        ui.heading(text);
+        ui.label(text);
     });
 }
