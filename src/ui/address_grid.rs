@@ -3,8 +3,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use egui::{WidgetText};
+use egui::WidgetText;
 use egui_extras::{Size, TableRow};
+use cached::proc_macro::cached;
 
 use crate::windex::Process;
 
@@ -28,9 +29,16 @@ pub enum DataType {
     #[default]
     FourBytes,
     EightBytes,
+    Float,
+    Double,
 }
 
-const ALL_DATA_TYPES: [DataType; 2] = [DataType::FourBytes, DataType::EightBytes];
+const ALL_DATA_TYPES: [DataType; 4] = [
+    DataType::FourBytes,
+    DataType::EightBytes,
+    DataType::Float,
+    DataType::Double,
+];
 
 impl DataType {
     /// Gets the display name of the given DataType.
@@ -38,6 +46,8 @@ impl DataType {
         match *self {
             DataType::FourBytes => "4 bytes",
             DataType::EightBytes => "8 bytes",
+            DataType::Float => "Float",
+            DataType::Double => "Double",
         }
     }
 
@@ -46,6 +56,8 @@ impl DataType {
         match *self {
             DataType::FourBytes => 4,
             DataType::EightBytes => 8,
+            DataType::Float => 4,
+            DataType::Double => 8,
         }
     }
 
@@ -54,6 +66,8 @@ impl DataType {
         let value = match *self {
             DataType::FourBytes => from_bytes!(value, i32),
             DataType::EightBytes => from_bytes!(value, i64),
+            DataType::Float => from_bytes!(value, f32),
+            DataType::Double => from_bytes!(value, f64),
         };
         value
     }
@@ -63,6 +77,8 @@ impl DataType {
         let value = match *self {
             DataType::FourBytes => to_bytes!(value, i32),
             DataType::EightBytes => to_bytes!(value, i64),
+            DataType::Float => to_bytes!(value, f32),
+            DataType::Double => to_bytes!(value, f64),
         };
         value
     }
@@ -153,12 +169,17 @@ impl AddressGrid {
 fn get_address_value(process: &Process, addr: &UserAddress) -> String {
     let address: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
     if let Ok(address) = address {
-        let mem = process.get_mem_at(address, addr.data_type.size_of());
+        let mem = get_mem_cached(process, address, addr.data_type.size_of());
         if let Ok(mem) = mem {
             return addr.data_type.from_bytes(mem);
         }
     }
     "???".to_string()
+}
+
+#[cached(time = 1, key = "(usize, usize)", convert = r#"{ (address, size) }"#)]
+fn get_mem_cached(process: &Process, address: usize, size: usize) -> Result<Vec<u8>, String> {
+    process.get_mem_at(address, size)
 }
 
 /// Set the value at the given address.
