@@ -1,6 +1,9 @@
-use super::address_grid::UserAddress;
 use crate::windex::Process;
 use cached::proc_macro::cached;
+
+struct SearchAddress {
+    address: String,
+}
 
 #[derive(Default)]
 pub struct Search {
@@ -29,16 +32,21 @@ impl Search {
 
 #[derive(Default)]
 struct SearchResults {
-    results: Vec<UserAddress>,
+    results: Vec<SearchAddress>,
 }
 
 impl SearchResults {
     pub fn show(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            for addr in self.results.iter().take(1000) {
-                let address = &addr.address;
-                ui.label(address.to_string());
-            }
+        ui.vertical(|ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, true])
+                .min_scrolled_height(150.0)
+                .show(ui, |ui| {
+                    for addr in self.results.iter().take(1000) {
+                        let address = &addr.address;
+                        ui.label(address.to_string());
+                    }
+                });
         });
     }
 }
@@ -56,14 +64,21 @@ struct SearchTools {
 impl SearchTools {
     pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults) {
         ui.horizontal(|ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.text_edit_singleline(&mut self.search_text);
-                if ui.button("Search").clicked() {
-                    results
-                        .results
-                        .push(UserAddress::new("21195DF8408".to_string()))
-                }
-            });
+            let text = ui.text_edit_singleline(&mut self.search_text);
+
+            if text.lost_focus() && text.ctx.input().key_pressed(egui::Key::Enter) {
+                // user pressed enter in the text area
+                results.results.push(SearchAddress {
+                    address: "aaaa".to_string(),
+                });
+                text.request_focus();
+            }
+
+            if ui.button("Search").clicked() {
+                results.results.push(SearchAddress {
+                    address: "aaaa".to_string(),
+                });
+            }
         });
     }
 }
