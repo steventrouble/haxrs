@@ -1,12 +1,11 @@
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-use address::DataTypeTrait;
 use cached::proc_macro::cached;
 use egui::WidgetText;
 use egui_extras::{Size, TableRow};
 
-use crate::windex::address;
+use crate::windex::{data_type, DataTypeTrait};
 use crate::windex::Process;
 
 static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
@@ -32,10 +31,10 @@ impl UserDataType {
     /// Get the associated info (byte sizes, etc) for a data type.
     fn info(&self) -> Box<dyn DataTypeTrait> {
         match *self {
-            UserDataType::FourBytes => Box::new(address::FourBytes),
-            UserDataType::EightBytes => Box::new(address::EightBytes),
-            UserDataType::Float => Box::new(address::Float),
-            UserDataType::Double => Box::new(address::Double),
+            UserDataType::FourBytes => Box::new(data_type::FourBytes),
+            UserDataType::EightBytes => Box::new(data_type::EightBytes),
+            UserDataType::Float => Box::new(data_type::Float),
+            UserDataType::Double => Box::new(data_type::Double),
         }
     }
 }
