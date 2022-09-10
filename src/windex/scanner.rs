@@ -23,7 +23,7 @@ fn scan_page(mem: &Vec<u8>, page_start: usize, value: &[u8]) -> Vec<usize> {
     let mut addresses = Vec::with_capacity(1024);
     for (i, v) in mem.chunks_exact(len).enumerate() {
         if v == value {
-            addresses.push(i*len+page_start);
+            addresses.push(i * len + page_start);
         }
     }
     addresses

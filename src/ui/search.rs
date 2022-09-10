@@ -1,4 +1,4 @@
-use crate::windex::{Process, scanner};
+use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
 
 struct SearchAddress {

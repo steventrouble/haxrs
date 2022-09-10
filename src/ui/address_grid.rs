@@ -1,6 +1,7 @@
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+use address::DataTypeTrait;
 use cached::proc_macro::cached;
 use egui::WidgetText;
 use egui_extras::{Size, TableRow};
@@ -10,10 +11,40 @@ use crate::windex::Process;
 
 static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Possible selections for the "data type" combo box.
+#[derive(PartialEq)]
+enum UserDataType {
+    FourBytes,
+    EightBytes,
+    Float,
+    Double,
+}
+
+/// All possible selections for the "data type" combo box.
+const ALL_DATA_TYPES: [UserDataType; 4] = [
+    UserDataType::FourBytes,
+    UserDataType::EightBytes,
+    UserDataType::Float,
+    UserDataType::Double,
+];
+
+impl UserDataType {
+    /// Get the associated info (byte sizes, etc) for a data type.
+    fn info(&self) -> Box<dyn DataTypeTrait> {
+        match *self {
+            UserDataType::FourBytes => Box::new(address::FourBytes),
+            UserDataType::EightBytes => Box::new(address::EightBytes),
+            UserDataType::Float => Box::new(address::Float),
+            UserDataType::Double => Box::new(address::Double),
+        }
+    }
+}
+
+/// The information the user provided for each address.
 pub struct UserAddress {
     id: usize,
     address: String,
-    data_type: address::DataType,
+    data_type: UserDataType,
     requested_val: String,
 }
 
@@ -22,7 +53,7 @@ impl UserAddress {
         UserAddress {
             id: ADDRESS_ID.fetch_add(1, Ordering::Relaxed),
             address: "".to_string(),
-            data_type: address::DataType::FourBytes,
+            data_type: UserDataType::FourBytes,
             requested_val: "".to_string(),
         }
     }
@@ -62,11 +93,11 @@ impl AddressGrid {
                             row.col(|ui| {
                                 let id = addr.id;
                                 egui::ComboBox::from_id_source(id)
-                                    .selected_text(format!("{}", addr.data_type.name()))
+                                    .selected_text(format!("{}", addr.data_type.info().name()))
                                     .width(ui.available_width() - 8.0)
                                     .show_ui(ui, |ui| {
-                                        for data_type in address::ALL_DATA_TYPES {
-                                            let name = &data_type.name().to_owned();
+                                        for data_type in ALL_DATA_TYPES {
+                                            let name = &data_type.info().name().to_owned();
                                             ui.selectable_value(
                                                 &mut addr.data_type,
                                                 data_type,
@@ -98,11 +129,12 @@ impl AddressGrid {
 
 /// Returns the value at the given address as a string.
 fn get_address_value(process: &Process, addr: &UserAddress) -> String {
+    let data_type = addr.data_type.info();
     let address: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
     if let Ok(address) = address {
-        let mem = get_mem_cached(process, address, addr.data_type.size_of());
+        let mem = get_mem_cached(process, address, data_type.size_of());
         if let Ok(mem) = mem {
-            return addr.data_type.from_bytes(mem);
+            return data_type.from_bytes(mem);
         }
     }
     "???".to_string()
@@ -115,7 +147,7 @@ fn get_mem_cached(process: &Process, address: usize, size: usize) -> Result<Vec<
 
 /// Set the value at the given address.
 fn set_address_value(process: &Process, addr: &UserAddress) {
-    let bytes = addr.data_type.to_bytes(&addr.requested_val);
+    let bytes = addr.data_type.info().to_bytes(&addr.requested_val);
     let address: Result<usize, _> = usize::from_str_radix(&addr.address, 16);
 
     if let (Ok(bytes), Ok(address)) = (bytes, address) {
