@@ -5,39 +5,11 @@ use cached::proc_macro::cached;
 use egui::WidgetText;
 use egui_extras::{Size, TableRow};
 
-use crate::windex::{data_type, DataTypeTrait};
 use crate::windex::Process;
+use super::TypeComboBox;
+use super::type_combo::UserDataType;
 
 static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
-
-/// Possible selections for the "data type" combo box.
-#[derive(PartialEq)]
-enum UserDataType {
-    FourBytes,
-    EightBytes,
-    Float,
-    Double,
-}
-
-/// All possible selections for the "data type" combo box.
-const ALL_DATA_TYPES: [UserDataType; 4] = [
-    UserDataType::FourBytes,
-    UserDataType::EightBytes,
-    UserDataType::Float,
-    UserDataType::Double,
-];
-
-impl UserDataType {
-    /// Get the associated info (byte sizes, etc) for a data type.
-    fn info(&self) -> Box<dyn DataTypeTrait> {
-        match *self {
-            UserDataType::FourBytes => Box::new(data_type::FourBytes),
-            UserDataType::EightBytes => Box::new(data_type::EightBytes),
-            UserDataType::Float => Box::new(data_type::Float),
-            UserDataType::Double => Box::new(data_type::Double),
-        }
-    }
-}
 
 /// The information the user provided for each address.
 pub struct UserAddress {
@@ -52,7 +24,7 @@ impl UserAddress {
         UserAddress {
             id: ADDRESS_ID.fetch_add(1, Ordering::Relaxed),
             address: "".to_string(),
-            data_type: UserDataType::FourBytes,
+            data_type: UserDataType::default(),
             requested_val: "".to_string(),
         }
     }
@@ -90,20 +62,7 @@ impl AddressGrid {
                                 ui.text_edit_singleline(&mut addr.address);
                             });
                             row.col(|ui| {
-                                let id = addr.id;
-                                egui::ComboBox::from_id_source(id)
-                                    .selected_text(format!("{}", addr.data_type.info().name()))
-                                    .width(ui.available_width() - 8.0)
-                                    .show_ui(ui, |ui| {
-                                        for data_type in ALL_DATA_TYPES {
-                                            let name = &data_type.info().name().to_owned();
-                                            ui.selectable_value(
-                                                &mut addr.data_type,
-                                                data_type,
-                                                name,
-                                            );
-                                        }
-                                    });
+                                addr.data_type.show(ui, addr.id);
                             });
                             row.col(|ui| {
                                 ui.label(get_address_value(process, addr));
