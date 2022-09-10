@@ -1,4 +1,4 @@
-use crate::windex::Process;
+use crate::windex::{Process, scanner};
 use cached::proc_macro::cached;
 
 struct SearchAddress {
@@ -12,13 +12,13 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn show(&mut self, ui: &mut egui::Ui) {
+    pub fn show(&mut self, ui: &mut egui::Ui, process: &Process) {
         ui.heading("Search");
         ui.horizontal(|ui| {
             // Search tools
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() / 2.0);
-                self.tools.show(ui, &mut self.results);
+                self.tools.show(ui, &mut self.results, &process);
             });
 
             // Search results
@@ -42,9 +42,10 @@ impl SearchResults {
                 .auto_shrink([false, true])
                 .min_scrolled_height(150.0)
                 .show(ui, |ui| {
+                    let num_results = self.results.len();
+                    ui.label(format!("{num_results} results"));
                     for addr in self.results.iter().take(1000) {
-                        let address = &addr.address;
-                        ui.label(address.to_string());
+                        ui.label(&addr.address.to_string());
                     }
                 });
         });
@@ -62,23 +63,33 @@ struct SearchTools {
 }
 
 impl SearchTools {
-    pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults) {
+    pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults, process: &Process) {
         ui.horizontal(|ui| {
             let text = ui.text_edit_singleline(&mut self.search_text);
 
             if text.lost_focus() && text.ctx.input().key_pressed(egui::Key::Enter) {
-                // user pressed enter in the text area
-                results.results.push(SearchAddress {
-                    address: "aaaa".to_string(),
-                });
+                let found = self.scan(process);
+                results.results.extend(found.iter().map(|x| SearchAddress {
+                    address: format!("{x:x}"),
+                }));
                 text.request_focus();
             }
 
             if ui.button("Search").clicked() {
-                results.results.push(SearchAddress {
-                    address: "aaaa".to_string(),
-                });
+                let found = self.scan(process);
+                results.results.extend(found.iter().map(|x| SearchAddress {
+                    address: format!("{x:x}"),
+                }));
             }
         });
+    }
+
+    fn scan(&self, process: &Process) -> Vec<usize> {
+        let search_val: Result<i32, _> = self.search_text.parse();
+        if search_val.is_err() {
+            return vec![];
+        }
+        let search_val = search_val.unwrap().to_ne_bytes();
+        scanner::scan(process, &search_val)
     }
 }

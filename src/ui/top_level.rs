@@ -54,7 +54,7 @@ impl eframe::App for MainApp {
 
                 if let Some(process) = &self.selected_process {
                     separator(ui);
-                    self.search.show(ui);
+                    self.search.show(ui, process);
                     separator(ui);
                     self.address_grid.show(ui, process);
                 }

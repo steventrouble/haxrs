@@ -2,14 +2,14 @@ use std::convert::TryInto;
 
 macro_rules! from_bytes {
     ($value:expr, $tye:ty) => {
-        <$tye>::from_le_bytes($value.try_into().expect("Invalid size")).to_string()
+        <$tye>::from_ne_bytes($value.try_into().expect("Invalid size")).to_string()
     };
 }
 
 macro_rules! to_bytes {
     ($value:expr, $tye:ty) => {
         match $value.parse::<$tye>() {
-            Ok(parsed) => Ok(parsed.to_le_bytes().to_vec()),
+            Ok(parsed) => Ok(parsed.to_ne_bytes().to_vec()),
             _ => Err("Parse Error".to_string()),
         }
     };

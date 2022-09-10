@@ -2,6 +2,7 @@ use std::mem;
 use windows::Win32::Foundation as win;
 use windows::Win32::System as winsys;
 use windows::Win32::System::Diagnostics::Debug as windbg;
+use windows::Win32::System::Memory as winmem;
 use windows::Win32::System::Threading::PROCESS_VM_WRITE;
 use winsys::ProcessStatus;
 use winsys::Threading::{PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
@@ -112,6 +113,49 @@ impl Process {
         }
         Ok(())
     }
+
+    /// Get the list of all the process's pages in virtual memory.
+    pub fn query_vmem(&self) -> Vec<VirtualPage> {
+        let mut pages: Vec<VirtualPage> = vec![];
+        let mut current: usize = 0;
+        for _ in 0..20000 {
+            let mut a = winmem::MEMORY_BASIC_INFORMATION::default();
+            let res = unsafe {
+                winmem::VirtualQueryEx(
+                    self.handle,
+                    current as _,
+                    &mut a,
+                    std::mem::size_of::<winmem::MEMORY_BASIC_INFORMATION>(),
+                )
+            };
+
+            if res == 0 {
+                break;
+            }
+
+            let base = a.BaseAddress as usize;
+            let region_size = a.RegionSize;
+            let next = base + region_size;
+            let committed = (a.State.0 & winmem::MEM_COMMIT.0) != 0x0;
+            if committed && writable(a.Protect.0) {
+                pages.push(VirtualPage {
+                    start: base,
+                    size: region_size,
+                });
+            }
+
+            if next < current || base > 0x7FFFFFFFFFFF {
+                break;
+            }
+            current = next;
+        }
+        pages
+    }
+}
+
+/// Returns true if the memory region is writable.
+fn writable(protect_flags: u32) -> bool {
+    (protect_flags & (winmem::PAGE_READWRITE.0 | winmem::PAGE_EXECUTE_READWRITE.0)) != 0
 }
 
 /// We *must* remember to close the handle when we're done.
@@ -128,4 +172,10 @@ fn to_processes(pids: Vec<u32>) -> Vec<Process> {
     pids.iter()
         .filter_map(|&pid| Process::new(pid).ok())
         .collect()
+}
+
+/// Info about a memory page.
+pub struct VirtualPage {
+    pub start: usize,
+    pub size: usize,
 }
