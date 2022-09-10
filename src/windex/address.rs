@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-macro_rules! data_type_fns {
+macro_rules! default_data_type_fns {
     ($tye:ty) => {
         fn size_of(&self) -> usize {
             std::mem::size_of::<$tye>()
@@ -35,7 +35,7 @@ impl DataTypeTrait for FourBytes {
         "4 bytes"
     }
 
-    data_type_fns!(i32);
+    default_data_type_fns!(i32);
 }
 
 /// Info about eight-byte dwords.
@@ -45,7 +45,7 @@ impl DataTypeTrait for EightBytes {
         "8 bytes"
     }
 
-    data_type_fns!(i64);
+    default_data_type_fns!(i64);
 }
 
 /// Info about four-byte floats.
@@ -55,7 +55,7 @@ impl DataTypeTrait for Float {
         "Float"
     }
 
-    data_type_fns!(f32);
+    default_data_type_fns!(f32);
 }
 
 /// Info about eight-byte doubles.
@@ -65,7 +65,7 @@ impl DataTypeTrait for Double {
         "Double"
     }
 
-    data_type_fns!(f64);
+    default_data_type_fns!(f64);
 }
 
 /// Represents an address in memory.
