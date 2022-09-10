@@ -1,6 +1,8 @@
 use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
 
+use super::{type_combo::UserDataType, TypeComboBox};
+
 struct SearchAddress {
     address: String,
 }
@@ -60,12 +62,15 @@ fn get_mem_cached(process: &Process, address: usize, size: usize) -> Result<Vec<
 #[derive(Default)]
 struct SearchTools {
     search_text: String,
+    data_type: UserDataType,
 }
 
 impl SearchTools {
     pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults, process: &Process) {
         ui.horizontal(|ui| {
             let text = ui.text_edit_singleline(&mut self.search_text);
+
+            self.data_type.show(ui, 9999999);
 
             if text.lost_focus() && text.ctx.input().key_pressed(egui::Key::Enter) {
                 let found = self.scan(process);
