@@ -13,14 +13,14 @@ static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// The information the user provided for each address.
 pub struct UserAddress {
-    id: usize,
-    address: String,
-    data_type: UserDataType,
-    requested_val: String,
+    pub id: usize,
+    pub address: String,
+    pub data_type: UserDataType,
+    pub requested_val: String,
 }
 
 impl UserAddress {
-    fn new() -> Self {
+    pub fn new() -> Self {
         UserAddress {
             id: ADDRESS_ID.fetch_add(1, Ordering::Relaxed),
             address: "".to_string(),

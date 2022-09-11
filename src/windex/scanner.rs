@@ -1,30 +1,59 @@
-use super::Process;
+use super::{DataTypeTrait, Process};
 
-const MAX_SCAN_BYTES: usize = 0x20000000; // 512 MiB
+const MAX_PAGE_BYTES: usize = 1 << 29; // 512 MiB
+const MIN_RESULTS_CAPACITY: usize = 1 << 14; // 16 KiB
 
 /// Scans the entire process for a match.
-pub fn scan(process: &Process, value: &[u8]) -> Vec<usize> {
-    let mut addresses = vec![];
+pub fn scan(
+    results: &mut Vec<usize>,
+    process: &Process,
+    value: &[u8],
+    data_type: Box<dyn DataTypeTrait>,
+) {
+    if results.capacity() < MIN_RESULTS_CAPACITY {
+        results.reserve(MIN_RESULTS_CAPACITY);
+    }
+
+    if results.is_empty() {
+        scan_all(results, process, value)
+    } else {
+        filter_addresses(results, process, value, data_type)
+    }
+}
+
+fn scan_all(results: &mut Vec<usize>, process: &Process, value: &[u8]) {
     let vmem = process.query_vmem();
     for vpage in vmem {
-        if vpage.size > MAX_SCAN_BYTES {
+        if vpage.size > MAX_PAGE_BYTES {
             panic!("Partial page scan not supported yet.")
         }
         let mem = process
             .get_mem_at(vpage.start, vpage.size)
             .unwrap_or_else(|_| vec![]);
-        addresses.append(&mut scan_page(&mem, vpage.start, value));
+        scan_page(results, &mem, vpage.start, value);
     }
-    addresses
 }
 
-fn scan_page(mem: &Vec<u8>, page_start: usize, value: &[u8]) -> Vec<usize> {
+fn scan_page(results: &mut Vec<usize>, mem: &Vec<u8>, page_start: usize, value: &[u8]) {
     let len = value.len();
-    let mut addresses = Vec::with_capacity(1024);
     for (i, v) in mem.chunks_exact(len).enumerate() {
         if v == value {
-            addresses.push(i * len + page_start);
+            results.push(i * len + page_start);
         }
     }
-    addresses
+}
+
+fn filter_addresses(
+    addresses: &mut Vec<usize>,
+    process: &Process,
+    value: &[u8],
+    data_type: Box<dyn DataTypeTrait>,
+) {
+    addresses.retain(|addr| {
+        let v = process.get_mem_at(*addr, data_type.size_of());
+        match v {
+            Ok(v) => v == value,
+            Err(_) => false,
+        }
+    })
 }

@@ -9,7 +9,6 @@ impl TypeComboBox for UserDataType {
     fn show(&mut self, ui: &mut egui::Ui, id: usize) {
         egui::ComboBox::from_id_source(id)
         .selected_text(format!("{}", self.info().name()))
-        .width(ui.available_width() - 8.0)
         .show_ui(ui, |ui| {
             for data_type in ALL_DATA_TYPES {
                 let name = &data_type.info().name().to_owned();
