@@ -1,3 +1,32 @@
+/// Possible selections for the "data type" combo box.
+#[derive(PartialEq, Default, Clone, Copy)]
+pub enum DataTypeEnum {
+    #[default]
+    FourBytes,
+    EightBytes,
+    Float,
+    Double,
+}
+
+/// All possible selections for the "data type" combo box.
+pub const ALL_DATA_TYPES: [DataTypeEnum; 4] = [
+    DataTypeEnum::FourBytes,
+    DataTypeEnum::EightBytes,
+    DataTypeEnum::Float,
+    DataTypeEnum::Double,
+];
+
+impl DataTypeEnum {
+    /// Get the associated info (byte sizes, etc) for a data type.
+    pub fn info(&self) -> Box<dyn DataTypeTrait> {
+        match *self {
+            DataTypeEnum::FourBytes => Box::new(FourBytes),
+            DataTypeEnum::EightBytes => Box::new(EightBytes),
+            DataTypeEnum::Float => Box::new(Float),
+            DataTypeEnum::Double => Box::new(Double),
+        }
+    }
+}
 
 // I wish the standard types implemented traits for things like
 // from_ne_bytes and such...

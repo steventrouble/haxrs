@@ -5,9 +5,9 @@ use cached::proc_macro::cached;
 use egui::WidgetText;
 use egui_extras::{Size, TableRow};
 
+use crate::windex::DataTypeEnum;
 use crate::windex::Process;
 use super::TypeComboBox;
-use super::type_combo::UserDataType;
 
 static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -15,7 +15,7 @@ static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 pub struct UserAddress {
     pub id: usize,
     pub address: String,
-    pub data_type: UserDataType,
+    pub data_type: DataTypeEnum,
     pub requested_val: String,
 }
 
@@ -24,7 +24,7 @@ impl UserAddress {
         UserAddress {
             id: ADDRESS_ID.fetch_add(1, Ordering::Relaxed),
             address: "".to_string(),
-            data_type: UserDataType::default(),
+            data_type: DataTypeEnum::default(),
             requested_val: "".to_string(),
         }
     }

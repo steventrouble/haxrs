@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::windex::{scanner, Process};
+use crate::windex::{scanner, Process, DataTypeEnum};
 use cached::proc_macro::cached;
 use egui::Layout;
 
-use super::{address_grid::UserAddress, type_combo::UserDataType, AddressGrid, TypeComboBox};
+use super::{address_grid::UserAddress, AddressGrid, TypeComboBox};
 
 #[derive(Default)]
 pub struct Search {
@@ -35,7 +35,7 @@ impl Search {
 struct SearchResults {
     results: Vec<usize>,
     checked: Vec<bool>,
-    data_type: UserDataType,
+    data_type: DataTypeEnum,
 }
 
 impl SearchResults {
@@ -80,7 +80,7 @@ fn get_mem_cached(process: &Process, address: usize, size: usize) -> Result<Vec<
 #[derive(Default)]
 struct SearchTools {
     search_text: String,
-    data_type: UserDataType,
+    data_type: DataTypeEnum,
 }
 
 impl SearchTools {
