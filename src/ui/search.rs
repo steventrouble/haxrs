@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
 use egui::Layout;
@@ -11,13 +13,13 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn show(&mut self, ui: &mut egui::Ui, process: &Process, address_grid: &mut AddressGrid) {
+    pub fn show(&mut self, ui: &mut egui::Ui, process: &Arc<Process>, address_grid: &mut AddressGrid) {
         ui.heading("Search");
         ui.horizontal(|ui| {
             // Search tools
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() / 2.0);
-                self.tools.show(ui, &mut self.results, &process);
+                self.tools.show(ui, &mut self.results, process);
             });
 
             // Search results
@@ -82,7 +84,7 @@ struct SearchTools {
 }
 
 impl SearchTools {
-    pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults, process: &Process) {
+    pub fn show(&mut self, ui: &mut egui::Ui, results: &mut SearchResults, process: &Arc<Process>) {
         ui.with_layout(Layout::top_down(egui::Align::Min), |ui| {
             // Search bar and button
             ui.horizontal(|ui| {
@@ -108,7 +110,7 @@ impl SearchTools {
         });
     }
 
-    fn scan(&self, results: &mut SearchResults, process: &Process) {
+    fn scan(&self, results: &mut SearchResults, process: &Arc<Process>) {
         let data_type = self.data_type.info();
         let bytes = data_type.to_bytes(&self.search_text);
         if let Ok(bytes) = bytes {

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{DataTypeTrait, Process};
 
 const MAX_PAGE_BYTES: usize = 1 << 29; // 512 MiB
@@ -6,7 +8,7 @@ const MIN_RESULTS_CAPACITY: usize = 1 << 14; // 16 KiB
 /// Scans the entire process for a match.
 pub fn scan(
     results: &mut Vec<usize>,
-    process: &Process,
+    process: &Arc<Process>,
     value: &[u8],
     data_type: Box<dyn DataTypeTrait>,
 ) {
@@ -21,7 +23,7 @@ pub fn scan(
     }
 }
 
-fn scan_all(results: &mut Vec<usize>, process: &Process, value: &[u8]) {
+fn scan_all(results: &mut Vec<usize>, process: &Arc<Process>, value: &[u8]) {
     let vmem = process.query_vmem();
     for vpage in vmem {
         if vpage.size > MAX_PAGE_BYTES {
@@ -45,7 +47,7 @@ fn scan_page(results: &mut Vec<usize>, mem: &Vec<u8>, page_start: usize, value: 
 
 fn filter_addresses(
     addresses: &mut Vec<usize>,
-    process: &Process,
+    process: &Arc<Process>,
     value: &[u8],
     data_type: Box<dyn DataTypeTrait>,
 ) {

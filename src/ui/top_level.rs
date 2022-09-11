@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use egui::{ScrollArea, TextEdit};
 
 use super::AddressGrid;
@@ -11,7 +13,7 @@ pub struct MainApp {
     connect_menu: ConnectMenu,
     search: Search,
 
-    selected_process: Option<Process>,
+    selected_process: Option<Arc<Process>>,
 }
 
 impl eframe::App for MainApp {
@@ -47,7 +49,7 @@ impl eframe::App for MainApp {
                             .inner
                             .flatten();
                         if selected.is_some() {
-                            self.selected_process = selected;
+                            self.selected_process = selected.map(|x| Arc::new(x));
                         }
                     });
                 });
