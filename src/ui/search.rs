@@ -1,6 +1,10 @@
+use std::sync::atomic::Ordering;
+use std::sync::{mpsc, atomic::AtomicBool};
+use std::sync::mpsc::Receiver;
 use std::sync::Arc;
+use std::thread;
 
-use crate::windex::{scanner, Process, DataTypeEnum};
+use crate::windex::{scanner, DataTypeEnum, Process};
 use cached::proc_macro::cached;
 use egui::Layout;
 
@@ -13,7 +17,12 @@ pub struct Search {
 }
 
 impl Search {
-    pub fn show(&mut self, ui: &mut egui::Ui, process: &Arc<Process>, address_grid: &mut AddressGrid) {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        process: &Arc<Process>,
+        address_grid: &mut AddressGrid,
+    ) {
         ui.heading("Search");
         ui.horizontal(|ui| {
             // Search tools
@@ -36,30 +45,34 @@ struct SearchResults {
     results: Vec<usize>,
     checked: Vec<bool>,
     data_type: DataTypeEnum,
+    results_rx: Option<Receiver<usize>>,
+    loading: Arc<AtomicBool>,
 }
 
 impl SearchResults {
     pub fn show(&mut self, ui: &mut egui::Ui, address_grid: &mut AddressGrid) {
-        if self.checked.len() != self.results.len() {
-            self.checked.clear();
-            self.checked.resize(self.results.len(), false);
+        if let Some(results_rx) = &self.results_rx {
+            for r in results_rx.try_iter() {
+                self.results.push(r);
+                self.checked.push(false);
+            }
         }
 
         ui.vertical(|ui| {
+            let num_results = self.results.len();
+            self.show_progress(ui, num_results);
             egui::ScrollArea::vertical()
                 .auto_shrink([false, true])
                 .min_scrolled_height(150.0)
                 .show(ui, |ui| {
-                    let num_results = self.results.len();
-                    ui.label(format!("{num_results} results"));
                     for (idx, addr) in self.results.iter().take(1000).enumerate() {
                         ui.checkbox(&mut self.checked[idx], format!("{addr:x}"));
                     }
                 });
             if ui.button("+ Add Selected").clicked() {
                 for (idx, checked) in self.checked.iter().enumerate() {
-                    let address = self.results[idx];
                     if *checked {
+                        let address = self.results[idx];
                         let mut addr = UserAddress::new();
                         addr.address = format!("{address:x}");
                         addr.data_type = self.data_type;
@@ -69,6 +82,14 @@ impl SearchResults {
                 self.checked.fill(false);
             }
         });
+    }
+
+    fn show_progress(&mut self, ui: &mut egui::Ui, num_results: usize) {
+        if self.loading.load(Ordering::Relaxed) {
+            ui.label(format!("Scanning - {num_results} results"));
+        } else {
+            ui.label(format!("{num_results} results"));
+        }
     }
 }
 
@@ -111,10 +132,25 @@ impl SearchTools {
     }
 
     fn scan(&self, results: &mut SearchResults, process: &Arc<Process>) {
-        let data_type = self.data_type.info();
-        let bytes = data_type.to_bytes(&self.search_text);
+        let (tx, rx) = mpsc::channel();
+        results.results_rx = Some(rx);
+
+        let data_type = self.data_type;
+        let info = data_type.info();
+        let bytes = info.to_bytes(&self.search_text);
+
+        let process = process.clone();
+        let to_filter = results.results.clone();
+        results.results.clear();
+
+        let loading = results.loading.clone();
+        loading.store(true, Ordering::Relaxed);
+
         if let Ok(bytes) = bytes {
-            scanner::scan(&mut results.results, process, &bytes, data_type);
+            thread::spawn(move || {
+                scanner::scan(tx, &process, &bytes, data_type, &to_filter);
+                loading.store(false, Ordering::Relaxed);
+            });
         }
         results.data_type = self.data_type;
     }
