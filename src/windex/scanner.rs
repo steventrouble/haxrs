@@ -4,7 +4,7 @@ use super::{DataTypeEnum, Process};
 
 const MAX_PAGE_BYTES: usize = 1 << 29; // 512 MiB
 
-/// Scans the entire process for a match.
+/// Scans the process for matches.
 pub fn scan(
     tx: Sender<usize>,
     process: &Arc<Process>,
@@ -19,6 +19,7 @@ pub fn scan(
     }
 }
 
+/// Scans the entire process memory for matches.
 fn scan_all(tx: Sender<usize>, process: &Arc<Process>, value: &[u8]) {
     let vmem = process.query_vmem();
     for vpage in vmem {
@@ -32,6 +33,7 @@ fn scan_all(tx: Sender<usize>, process: &Arc<Process>, value: &[u8]) {
     }
 }
 
+/// Scans a single page in memory for matches.
 fn scan_page(tx: &Sender<usize>, mem: &Vec<u8>, page_start: usize, value: &[u8]) {
     let len = value.len();
     for (i, v) in mem.chunks_exact(len).enumerate() {
@@ -41,6 +43,7 @@ fn scan_page(tx: &Sender<usize>, mem: &Vec<u8>, page_start: usize, value: &[u8])
     }
 }
 
+/// Filters and existing list of addresses down to only those that match.
 fn filter_addresses(
     tx: Sender<usize>,
     process: &Arc<Process>,
