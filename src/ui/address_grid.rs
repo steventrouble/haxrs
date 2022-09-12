@@ -15,6 +15,7 @@ static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 /// The information the user provided for each address.
 pub struct UserAddress {
     pub id: usize,
+    pub description: String,
     pub address: String,
     pub data_type: DataTypeEnum,
     pub requested_val: String,
@@ -24,9 +25,10 @@ impl UserAddress {
     pub fn new() -> Self {
         UserAddress {
             id: ADDRESS_ID.fetch_add(1, Ordering::Relaxed),
-            address: "".to_string(),
+            description: String::new(),
+            address: String::new(),
             data_type: DataTypeEnum::default(),
-            requested_val: "".to_string(),
+            requested_val: String::new(),
         }
     }
 }
@@ -45,12 +47,14 @@ impl AddressGrid {
             egui_extras::TableBuilder::new(ui)
                 .resizable(true)
                 .column(Size::relative(0.25).at_least(40.0))
+                .column(Size::relative(0.25).at_least(40.0))
                 .column(Size::initial(100.0).at_least(40.0))
                 .column(Size::remainder().at_least(40.0))
                 .column(Size::remainder().at_least(40.0))
                 .column(Size::initial(30.0).at_least(20.0))
                 .column(Size::initial(30.0).at_least(20.0))
                 .header(20.0, |mut header| {
+                    header_col(&mut header, "Description");
                     header_col(&mut header, "Address");
                     header_col(&mut header, "Type");
                     header_col(&mut header, "Value");
@@ -65,7 +69,7 @@ impl AddressGrid {
                         self.addresses.remove(idx);
                     }
                 });
-            });
+        });
         if ui.button("+ Add Row").clicked() {
             self.addresses.push(UserAddress::new());
         }
@@ -79,6 +83,9 @@ impl AddressGrid {
     ) {
         for (idx, addr) in self.addresses.iter_mut().enumerate() {
             body.row(20.0, |mut row| {
+                row.col(|ui| {
+                    ui.text_edit_singleline(&mut addr.description);
+                });
                 row.col(|ui| {
                     ui.text_edit_singleline(&mut addr.address);
                 });

@@ -63,6 +63,10 @@ impl eframe::App for MainApp {
             });
         });
     }
+
+    fn persist_native_window(&self) -> bool {
+        true
+    }
 }
 
 /// Add a custom styled separator.
