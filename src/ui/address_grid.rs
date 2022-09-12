@@ -3,11 +3,12 @@ use std::sync::atomic::Ordering;
 
 use cached::proc_macro::cached;
 use egui::WidgetText;
+use egui_extras::TableBody;
 use egui_extras::{Size, TableRow};
 
+use super::TypeComboBox;
 use crate::windex::DataTypeEnum;
 use crate::windex::Process;
-use super::TypeComboBox;
 
 static ADDRESS_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -47,40 +48,60 @@ impl AddressGrid {
                 .column(Size::initial(100.0).at_least(40.0))
                 .column(Size::remainder().at_least(40.0))
                 .column(Size::remainder().at_least(40.0))
-                .column(Size::initial(30.0).at_least(40.0))
+                .column(Size::initial(30.0).at_least(20.0))
+                .column(Size::initial(30.0).at_least(20.0))
                 .header(20.0, |mut header| {
                     header_col(&mut header, "Address");
                     header_col(&mut header, "Type");
                     header_col(&mut header, "Value");
                     header_col(&mut header, "Edit");
                     header_col(&mut header, "✔");
+                    header_col(&mut header, "❌");
                 })
                 .body(|mut body| {
-                    for addr in self.addresses.iter_mut() {
-                        body.row(20.0, |mut row| {
-                            row.col(|ui| {
-                                ui.text_edit_singleline(&mut addr.address);
-                            });
-                            row.col(|ui| {
-                                addr.data_type.show(ui, addr.id);
-                            });
-                            row.col(|ui| {
-                                ui.label(get_address_value(process, addr));
-                            });
-                            row.col(|ui| {
-                                ui.text_edit_singleline(&mut addr.requested_val);
-                            });
-                            row.col(|ui| {
-                                if ui.button("Set").clicked() {
-                                    set_address_value(process, addr);
-                                }
-                            });
-                        })
+                    let mut to_remove: Vec<usize> = vec![];
+                    self.render_address_row(&mut body, &mut to_remove, process);
+                    for idx in to_remove {
+                        self.addresses.remove(idx);
                     }
                 });
-        });
+            });
         if ui.button("+ Add Row").clicked() {
             self.addresses.push(UserAddress::new());
+        }
+    }
+
+    fn render_address_row(
+        &mut self,
+        body: &mut TableBody,
+        to_remove: &mut Vec<usize>,
+        process: &Process,
+    ) {
+        for (idx, addr) in self.addresses.iter_mut().enumerate() {
+            body.row(20.0, |mut row| {
+                row.col(|ui| {
+                    ui.text_edit_singleline(&mut addr.address);
+                });
+                row.col(|ui| {
+                    addr.data_type.show(ui, addr.id);
+                });
+                row.col(|ui| {
+                    ui.label(get_address_value(process, addr));
+                });
+                row.col(|ui| {
+                    ui.text_edit_singleline(&mut addr.requested_val);
+                });
+                row.col(|ui| {
+                    if ui.button("Set").clicked() {
+                        set_address_value(process, addr);
+                    }
+                });
+                row.col(|ui| {
+                    if ui.button("Del").clicked() {
+                        to_remove.push(idx);
+                    }
+                });
+            })
         }
     }
 }
