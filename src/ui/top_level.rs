@@ -98,7 +98,9 @@ impl ConnectMenu {
 
             if text.lost_focus() && text.ctx.input().key_pressed(egui::Key::Enter) {
                 // user pressed enter in the text area
-                user_selection = processes.drain(0..1).next(); // get first process
+                if processes.len() >= 1 {
+                    user_selection = processes.drain(0..1).next(); // get first process
+                }
                 self.close_menu(ui);
                 return;
             }

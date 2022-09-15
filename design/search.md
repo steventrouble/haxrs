@@ -28,8 +28,8 @@ Create a textual query language that can be used to scan memory.
 | Comparator | `>=625` |
 | Within range | `0 .. 5.3e5` |
 | Is valid pointer | `is ptr` |
-| Is  | `bytes:4` |
-| Alignment | `align:4` |
+| Number of bytes | `bytes:4` | Must be combined with others
+| Alignment | `align:4` | Must be combined with others
 
 **Basic math:**
 
