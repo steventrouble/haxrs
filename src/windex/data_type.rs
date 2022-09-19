@@ -36,7 +36,7 @@ macro_rules! default_data_type_fns {
           std::mem::size_of::<$tye>()
       }
 
-      fn from_bytes(&self, value: Vec<u8>) -> String {
+      fn from_bytes(&self, value: &[u8]) -> String {
           <$tye>::from_ne_bytes(value.try_into().expect("Invalid size")).to_string()
       }
 
@@ -54,7 +54,7 @@ pub trait DataTypeTrait {
   fn name(&self) -> &str;
 
   fn size_of(&self) -> usize;
-  fn from_bytes(&self, value: Vec<u8>) -> String;
+  fn from_bytes(&self, value: &[u8]) -> String;
   fn to_bytes(&self, value: &String) -> Result<Vec<u8>, String>;
 }
 

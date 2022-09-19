@@ -4,6 +4,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::thread;
 
+use crate::windex::scanner::SearchResult;
 use crate::windex::{scanner, DataTypeEnum, Process};
 use cached::proc_macro::cached;
 use egui::Layout;
@@ -42,10 +43,10 @@ impl Search {
 
 #[derive(Default)]
 struct SearchResults {
-    results: Vec<usize>,
+    results: Vec<SearchResult>,
     checked: Vec<bool>,
     data_type: DataTypeEnum,
-    results_rx: Option<Receiver<usize>>,
+    results_rx: Option<Receiver<SearchResult>>,
     loading: Arc<AtomicBool>,
 }
 
@@ -65,17 +66,21 @@ impl SearchResults {
                 .auto_shrink([false, true])
                 .min_scrolled_height(150.0)
                 .show(ui, |ui| {
-                    for (idx, addr) in self.results.iter().take(1000).enumerate() {
-                        ui.checkbox(&mut self.checked[idx], format!("{addr:x}"));
+                    for (idx, result) in self.results.iter().take(1000).enumerate() {
+                        let addr = result.address;
+                        let value = result.value_to_string();
+                        ui.checkbox(&mut self.checked[idx], format!("{addr:x} - {value}"));
                     }
                 });
             if ui.button("+ Add Selected").clicked() {
                 for (idx, checked) in self.checked.iter().enumerate() {
                     if *checked {
-                        let address = self.results[idx];
+                        let result = &self.results[idx];
+                        let address = result.address;
+
                         let mut addr = UserAddress::new();
                         addr.address = format!("{address:x}");
-                        addr.data_type = self.data_type;
+                        addr.data_type = result.data_type;
                         address_grid.addresses.push(addr);
                     }
                 }
