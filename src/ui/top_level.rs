@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use egui::{ScrollArea, TextEdit};
 
@@ -20,6 +21,7 @@ impl eframe::App for MainApp {
     /// Called on each frame to render the UI.
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         ctx.set_visuals(egui::Visuals::light());
+        ctx.request_repaint_after(Duration::from_secs(1));
 
         // Context menus
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {

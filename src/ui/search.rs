@@ -5,11 +5,12 @@ use std::sync::Arc;
 use std::thread;
 
 use crate::windex::scanner::SearchResult;
-use crate::windex::{scanner, DataTypeEnum, Process};
+use crate::parser;
+use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
 use egui::Layout;
 
-use super::{address_grid::UserAddress, AddressGrid, TypeComboBox};
+use super::{address_grid::UserAddress, AddressGrid};
 
 #[derive(Default)]
 pub struct Search {
@@ -45,7 +46,6 @@ impl Search {
 struct SearchResults {
     results: Vec<SearchResult>,
     checked: Vec<bool>,
-    data_type: DataTypeEnum,
     results_rx: Option<Receiver<SearchResult>>,
     loading: Arc<AtomicBool>,
 }
@@ -106,7 +106,6 @@ fn get_mem_cached(process: &Process, address: usize, size: usize) -> Result<Vec<
 #[derive(Default)]
 struct SearchTools {
     search_text: String,
-    data_type: DataTypeEnum,
 }
 
 impl SearchTools {
@@ -130,9 +129,6 @@ impl SearchTools {
                     self.scan(results, process);
                 }
             });
-
-            // Data type combo box
-            self.data_type.show(ui, 9999999);
         });
     }
 
@@ -140,9 +136,7 @@ impl SearchTools {
         let (tx, rx) = mpsc::channel();
         results.results_rx = Some(rx);
 
-        let data_type = self.data_type;
-        let info = data_type.info();
-        let bytes = info.to_bytes(&self.search_text);
+        let query = parser::parse(&self.search_text);
 
         let process = process.clone();
         let to_filter = results.results.clone();
@@ -151,12 +145,11 @@ impl SearchTools {
         let loading = results.loading.clone();
         loading.store(true, Ordering::Relaxed);
 
-        if let Ok(bytes) = bytes {
+        if let Ok(query) = query {
             thread::spawn(move || {
-                scanner::scan(tx, &process, &bytes, data_type, &to_filter);
+                scanner::scan(tx, &process, query, &to_filter);
                 loading.store(false, Ordering::Relaxed);
             });
         }
-        results.data_type = self.data_type;
     }
 }

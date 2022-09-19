@@ -46,6 +46,10 @@ macro_rules! default_data_type_fns {
               _ => Err("Parse Error".to_string()),
           }
       }
+
+      fn display(&self, value: &[u8]) -> String {
+        format!("{:.5e}", <$tye>::from_ne_bytes(value.try_into().expect("Invalid size")))
+      }
   };
 }
 
@@ -56,6 +60,7 @@ pub trait DataTypeTrait {
   fn size_of(&self) -> usize;
   fn from_bytes(&self, value: &[u8]) -> String;
   fn to_bytes(&self, value: &String) -> Result<Vec<u8>, String>;
+  fn display(&self, value: &[u8]) -> String;
 }
 
 /// Info about four-byte words.

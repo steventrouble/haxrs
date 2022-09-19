@@ -120,7 +120,7 @@ fn get_address_value(process: &Process, addr: &UserAddress) -> String {
     if let Ok(address) = address {
         let mem = get_mem_cached(process, address, data_type.size_of());
         if let Ok(mem) = mem {
-            return data_type.from_bytes(&mem);
+            return data_type.display(&mem);
         }
     }
     "???".to_string()

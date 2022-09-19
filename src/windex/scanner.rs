@@ -1,6 +1,8 @@
 use std::sync::{mpsc::Sender, Arc};
 
-use super::{DataTypeEnum, Process};
+use crate::parser::Node;
+
+use super::{Process, DataTypeEnum};
 
 const MAX_PAGE_BYTES: usize = 1 << 29; // 512 MiB
 
@@ -13,7 +15,7 @@ pub struct SearchResult {
 
 impl SearchResult {
     pub fn value_to_string(&self) -> String {
-        self.data_type.info().from_bytes(&self.value)
+        self.data_type.info().display(&self.value)
     }
 }
 
@@ -21,24 +23,18 @@ impl SearchResult {
 pub fn scan(
     tx: Sender<SearchResult>,
     process: &Arc<Process>,
-    value: &[u8],
-    data_type: DataTypeEnum,
+    query: Node,
     to_filter: &Vec<SearchResult>,
 ) {
     if to_filter.is_empty() {
-        scan_all(tx, process, value, data_type)
+        scan_all(tx, process, query)
     } else {
-        filter_addresses(tx, process, value, data_type, to_filter)
+        filter_addresses(tx, process, query, to_filter)
     }
 }
 
 /// Scans the entire process memory for matches.
-fn scan_all(
-    tx: Sender<SearchResult>,
-    process: &Arc<Process>,
-    value: &[u8],
-    data_type: DataTypeEnum,
-) {
+fn scan_all(tx: Sender<SearchResult>, process: &Arc<Process>, query: Node) {
     let vmem = process.query_vmem();
     for vpage in vmem {
         if vpage.size > MAX_PAGE_BYTES {
@@ -47,28 +43,7 @@ fn scan_all(
         let mem = process
             .get_mem_at(vpage.start, vpage.size)
             .unwrap_or_else(|_| vec![]);
-        scan_page(&tx, &mem, vpage.start, value, data_type);
-    }
-}
-
-/// Scans a single page in memory for matches.
-fn scan_page(
-    tx: &Sender<SearchResult>,
-    mem: &Vec<u8>,
-    page_start: usize,
-    value: &[u8],
-    data_type: DataTypeEnum,
-) {
-    let len = value.len();
-    for (i, v) in mem.chunks_exact(len).enumerate() {
-        if v == value {
-            let result = SearchResult {
-                address: i * len + page_start,
-                data_type,
-                value: v.to_vec(),
-            };
-            tx.send(result).unwrap();
-        }
+        query.scan_page(&tx, &mem, vpage.start);
     }
 }
 
@@ -76,20 +51,16 @@ fn scan_page(
 fn filter_addresses(
     tx: Sender<SearchResult>,
     process: &Arc<Process>,
-    value: &[u8],
-    data_type: DataTypeEnum,
-    to_filter: &Vec<SearchResult>,
+    query: Node,
+    previous_results: &Vec<SearchResult>,
 ) {
-    let data_type_size = data_type.info().size_of();
-    for result in to_filter {
-        let address = result.address;
-        let v = process.get_mem_at(address, data_type_size);
+    for result in previous_results {
+        let v = process.get_mem_at(result.address, result.data_type.info().size_of());
         if let Ok(v) = v {
-            if v == value {
+            if query.test_single(&v, result.data_type) {
                 let result = SearchResult {
-                    address,
-                    data_type,
-                    value: v.to_vec(),
+                    value: v,
+                    ..*result
                 };
                 tx.send(result).unwrap();
             }

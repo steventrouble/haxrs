@@ -1,0 +1,16 @@
+SearchQuery = _{SOI ~ Num ~ EOI}
+
+Num = ${
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+    ~ ("." ~ TrailingDecimal)?
+    ~ (^"e" ~ FloatPower)?
+}
+
+TrailingDecimal = @{
+    ASCII_DIGIT*
+}
+
+FloatPower = @{
+    ("+" | "-")? ~ ASCII_DIGIT+
+}
