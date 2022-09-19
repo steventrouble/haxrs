@@ -1,5 +1,33 @@
-SearchQuery = _{SOI ~ Num ~ EOI}
+//
+// WARNING: Compilation errors in this file don't show at build time.
+// Use https://pest.rs/#editor to test this file.
+//
 
+SearchQuery = _{SOI ~ (MatchExpr) ~ EOI}
+
+WHITESPACE = _{ " " }
+
+// Expressions
+MatchExpr = {
+    Comparator?
+    ~ Num
+}
+
+// Operators
+BinaryOp = @{
+    "and"
+}
+
+Comparator = @{
+    ">"
+    | ">="
+    | "<"
+    | "<="
+    | "="
+    | "!="
+}
+
+// Values
 Num = ${
     "-"?
     ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)

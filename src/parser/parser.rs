@@ -16,84 +16,101 @@ pub struct ConstantMatcher {
     as_float: Option<(f64, i32)>,
 }
 
+/// Represents a comparator to use. Values in memory will match if greater than the
+/// value that follows the comparator.
+pub enum Comparator {
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Eq,
+    Neq,
+}
+
+impl Comparator {
+    pub fn matches_int<T: PartialOrd>(&self, mem: T, val: T) -> bool {
+        match self {
+            Comparator::Eq => mem == val,
+            Comparator::Neq => mem != val,
+            Comparator::Gt => mem > val,
+            Comparator::Gte => mem >= val,
+            Comparator::Lt => mem < val,
+            Comparator::Lte => mem <= val,
+        }
+    }
+
+    pub fn matches_float<T: PartialOrd>(&self, mem: T, val: T, lower: T, upper: T) -> bool {
+        match self {
+            Comparator::Eq => mem > lower && mem < upper,
+            Comparator::Neq => mem < lower || mem > upper,
+            Comparator::Gt => mem > val,
+            Comparator::Gte => mem >= val,
+            Comparator::Lt => mem < val,
+            Comparator::Lte => mem <= val,
+        }
+    }
+
+    fn from_str(val: &str) -> Comparator {
+        match val {
+            ">" => Comparator::Gt,
+            ">=" => Comparator::Gte,
+            "<" => Comparator::Lt,
+            "<=" => Comparator::Lte,
+            "=" => Comparator::Eq,
+            "!=" => Comparator::Neq,
+            "" => Comparator::Eq,
+            unknown => panic!("Unknown operator {}.", unknown),
+        }
+    }
+}
+
 /// A node in the AST of the search query.
 /// Generally, a Node represents a Matcher that can match values in memory.
 pub enum Node {
     Constant(ConstantMatcher),
+    MatchExpr { op: Comparator, val: Box<Node> },
 }
 
 impl Node {
+    pub fn as_constant(&self) -> &ConstantMatcher {
+        match self {
+            Node::Constant(info) => info,
+            _unknown => panic!("No constant found for comparator."),
+        }
+    }
+
     /// Scans an entire page of memory for things that match.
     pub fn scan_page(&self, tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize) {
         match self {
-            Node::Constant(info) => scan_page(tx, mem, addr_start, info),
+            Node::Constant(matcher) => scan_page(tx, mem, addr_start, &Comparator::Eq, matcher),
+            Node::MatchExpr { op, val } => scan_page(tx, mem, addr_start, op, val.as_constant()),
         }
     }
 
     /// Compares a single value against this matcher.
     pub fn test_single(&self, mem: &[u8], data_type: DataTypeEnum) -> bool {
         match self {
-            Node::Constant(info) => {
-                match data_type {
-                    DataTypeEnum::FourBytes => {
-                        if let Some(value) = info.as_int {
-                            if let Ok(v) = bytemuck::try_from_bytes::<i32>(mem) {
-                                if *v == value as i32 {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                    DataTypeEnum::EightBytes => {
-                        if let Some(value) = info.as_int {
-                            if let Ok(v) = bytemuck::try_from_bytes::<i64>(mem) {
-                                if *v == value {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                    DataTypeEnum::Float => {
-                        if let Some((value, decimal_digits)) = info.as_float {
-                            let lowest_digit = (10.0 as f32).powf(-(decimal_digits as f32));
-                            let value = value as f32;
-                            let lower_bound = value - lowest_digit;
-                            let upper_bound = value + lowest_digit;
-                            if let Ok(v) = bytemuck::try_from_bytes::<f32>(mem) {
-                                if *v > lower_bound && *v < upper_bound {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                    DataTypeEnum::Double => {
-                        if let Some((value, decimal_digits)) = info.as_float {
-                            let lowest_digit = (10.0 as f64).powf(-(decimal_digits as f64));
-                            let lower_bound = value - lowest_digit;
-                            let upper_bound = value + lowest_digit;
-                            if let Ok(v) = bytemuck::try_from_bytes::<f64>(mem) {
-                                if *v > lower_bound && *v < upper_bound {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                false
-            }
+            Node::Constant(matcher) => compare_single(mem, data_type, &Comparator::Eq, matcher),
+            Node::MatchExpr { op, val } => compare_single(mem, data_type, op, val.as_constant()),
         }
     }
 }
 
 /// Scans an entire page of memory for things that match.
-fn scan_page(tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize, values: &ConstantMatcher) {
+fn scan_page(
+    tx: &Sender<SearchResult>,
+    mem: &[u8],
+    addr_start: usize,
+    op: &Comparator,
+    values: &ConstantMatcher,
+) {
     if let Some(value) = values.as_int {
         for (i, &v) in bytemuck::try_cast_slice::<u8, i64>(mem)
             .unwrap_or(&[])
             .iter()
             .enumerate()
         {
-            if v == value {
+            if op.matches_int(v, value) {
                 let result = SearchResult {
                     address: i * size_of::<i64>() + addr_start,
                     data_type: DataTypeEnum::EightBytes,
@@ -103,12 +120,12 @@ fn scan_page(tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize, values: &
             }
         }
         let value = value as i32;
-        for (i, v) in bytemuck::try_cast_slice::<u8, i32>(mem)
+        for (i, &v) in bytemuck::try_cast_slice::<u8, i32>(mem)
             .unwrap_or(&[])
             .iter()
             .enumerate()
         {
-            if *v == value {
+            if op.matches_int(v, value) {
                 let result = SearchResult {
                     address: i * size_of::<i32>() + addr_start,
                     data_type: DataTypeEnum::FourBytes,
@@ -123,12 +140,12 @@ fn scan_page(tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize, values: &
         let lowest_digit = (10.0 as f64).powf(-(decimal_digits as f64));
         let lower_bound = value - lowest_digit * 0.999;
         let upper_bound = value + lowest_digit * 0.999;
-        for (i, v) in bytemuck::try_cast_slice::<u8, f64>(mem)
+        for (i, &v) in bytemuck::try_cast_slice::<u8, f64>(mem)
             .unwrap_or(&[])
             .iter()
             .enumerate()
         {
-            if *v > lower_bound && *v < upper_bound {
+            if op.matches_float(v, value, lower_bound, upper_bound) {
                 let result = SearchResult {
                     address: i * size_of::<f64>() + addr_start,
                     data_type: DataTypeEnum::Double,
@@ -141,12 +158,12 @@ fn scan_page(tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize, values: &
         let lowest_digit = lowest_digit as f32;
         let lower_bound = value - lowest_digit;
         let upper_bound = value + lowest_digit;
-        for (i, v) in bytemuck::try_cast_slice::<u8, f32>(mem)
+        for (i, &v) in bytemuck::try_cast_slice::<u8, f32>(mem)
             .unwrap_or(&[])
             .iter()
             .enumerate()
         {
-            if *v > lower_bound && *v < upper_bound {
+            if op.matches_float(v, value, lower_bound, upper_bound) {
                 let result = SearchResult {
                     address: i * size_of::<f32>() + addr_start,
                     data_type: DataTypeEnum::Float,
@@ -158,20 +175,58 @@ fn scan_page(tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize, values: &
     }
 }
 
-pub enum ParseError {
-    Unknown,
-}
-
-impl<T> From<pest::error::Error<T>> for ParseError {
-    fn from(_: pest::error::Error<T>) -> Self {
-        ParseError::Unknown
+fn compare_single(
+    mem: &[u8],
+    data_type: DataTypeEnum,
+    op: &Comparator,
+    values: &ConstantMatcher,
+) -> bool {
+    match data_type {
+        DataTypeEnum::FourBytes => {
+            if let Some(value) = values.as_int {
+                if let Ok(&v) = bytemuck::try_from_bytes::<i32>(mem) {
+                    if op.matches_int(v, value as i32) {
+                        return true;
+                    }
+                }
+            }
+        }
+        DataTypeEnum::EightBytes => {
+            if let Some(value) = values.as_int {
+                if let Ok(&v) = bytemuck::try_from_bytes::<i64>(mem) {
+                    if op.matches_int(v, value) {
+                        return true;
+                    }
+                }
+            }
+        }
+        DataTypeEnum::Float => {
+            if let Some((value, decimal_digits)) = values.as_float {
+                let lowest_digit = (10.0 as f32).powf(-(decimal_digits as f32));
+                let value = value as f32;
+                let lower_bound = value - lowest_digit;
+                let upper_bound = value + lowest_digit;
+                if let Ok(&v) = bytemuck::try_from_bytes::<f32>(mem) {
+                    if op.matches_float(v, value, lower_bound, upper_bound) {
+                        return true;
+                    }
+                }
+            }
+        }
+        DataTypeEnum::Double => {
+            if let Some((value, decimal_digits)) = values.as_float {
+                let lowest_digit = (10.0 as f64).powf(-(decimal_digits as f64));
+                let lower_bound = value - lowest_digit;
+                let upper_bound = value + lowest_digit;
+                if let Ok(&v) = bytemuck::try_from_bytes::<f64>(mem) {
+                    if op.matches_float(v, value, lower_bound, upper_bound) {
+                        return true;
+                    }
+                }
+            }
+        }
     }
-}
-
-impl From<ParseError> for String {
-    fn from(_: ParseError) -> String {
-        "".to_string()
-    }
+    false
 }
 
 /// Tries to parse a float, and returns (float, precision) if successful.
@@ -194,24 +249,44 @@ fn parse_float(val: pest::iterators::Pair<Rule>) -> Option<(f64, i32)> {
 
 /// Builds a matcher from a parsed search query.
 fn build_matcher(pair: pest::iterators::Pair<Rule>) -> Node {
+    println!("got {}", pair);
     match pair.as_rule() {
         Rule::Num => Node::Constant(ConstantMatcher {
             as_int: pair.as_str().parse::<i64>().ok(),
             as_float: parse_float(pair),
         }),
-        _unknown => panic!("Unknown err, call the dev."),
+        Rule::MatchExpr => {
+            let mut pair = pair.into_inner();
+            let first = pair.next().unwrap();
+            let mut op = Comparator::Eq;
+            let val: Box<Node>;
+            if first.as_rule() == Rule::Comparator {
+                op = Comparator::from_str(first.as_str());
+                val = Box::new(build_matcher(pair.next().unwrap()));
+            } else {
+                val = Box::new(build_matcher(first))
+            }
+            Node::MatchExpr { op, val }
+        },
+        unknown => panic!("Unexpected syntax element {:?}.", unknown),
     }
 }
 
 /// Parses a search query and returns a matcher representing that query.
-pub fn parse(input: &str) -> Result<Node, ParseError> {
-    let pairs = SearchParser::parse(Rule::SearchQuery, input)?;
-    for pair in pairs {
-        if let Rule::Num = pair.as_rule() {
-            return Ok(build_matcher(pair));
+pub fn parse(input: &str) -> Result<Node, String> {
+    let pairs = SearchParser::parse(Rule::SearchQuery, input);
+    match pairs {
+        Ok(pairs) => {
+            println!("Got {}", pairs);
+            for pair in pairs {
+                return Ok(build_matcher(pair));
+            }
+        }
+        Err(err) => {
+            return Err(err.to_string());
         }
     }
-    Err(ParseError::Unknown)
+    Err("Unknown error".to_string())
 }
 
 #[cfg(test)]
@@ -221,7 +296,7 @@ mod tests {
 
     fn haystack(needle: &[u8]) -> (Vec<u8>, usize) {
         let needle_len = needle.len();
-        let mut bytes: Vec<u8> = vec![1; 4096];
+        let mut bytes: Vec<u8> = vec![0; 4096];
         let index = ((rand::random::<usize>() % bytes.len()) / needle_len) * needle_len;
         for (idx, b) in needle.iter().enumerate() {
             bytes[index + idx] = *b;
@@ -229,46 +304,49 @@ mod tests {
         (bytes, index)
     }
 
-    #[test]
-    fn finds_int() -> Result<(), String> {
-        let val: i32 = 625;
-        let (bytes, needle) = haystack(&val.to_ne_bytes());
+    fn perform_search(val_bytes: &[u8], query: &str) -> bool {
+        let (bytes, needle) = haystack(val_bytes);
         let (tx, rx) = mpsc::channel();
 
-        let fun = parse("625")?;
+        let fun = parse(query).unwrap();
         fun.scan_page(&tx, &bytes, 0);
-        let found: Vec<SearchResult> = rx.try_iter().collect();
+        let actual: Vec<SearchResult> = rx.try_iter().collect();
 
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].address, needle);
-        Ok(())
+        let mut found = false;
+        if actual.len() >= 1 && actual.iter().any(|res| res.address == needle) {
+            found = true;
+        }
+
+        found
     }
 
     #[test]
-    fn finds_float() -> Result<(), String> {
-        let val: f32 = 625.10001; // should find approx match
-        let (bytes, needle) = haystack(&val.to_ne_bytes());
-        let (tx, rx) = mpsc::channel();
-
-        let fun = parse("625.1")?;
-        fun.scan_page(&tx, &bytes, 0);
-        let found: Vec<SearchResult> = rx.try_iter().collect();
-
-        assert_eq!(found.len(), 1);
-        assert_eq!(found[0].address, needle);
-        Ok(())
+    fn finds_int() {
+        let needle: i32 = 625;
+        assert!(perform_search(&needle.to_ne_bytes(), "625"));
     }
 
     #[test]
-    fn no_find() -> Result<(), String> {
-        let val: i32 = 625;
-        let (bytes, _) = haystack(&val.to_ne_bytes());
-        let (tx, rx) = mpsc::channel();
+    fn finds_float() {
+        let needle: f32 = 625.10001;
+        assert!(perform_search(&needle.to_ne_bytes(), "=625.1"));
+    }
 
-        let fun = parse("9999")?;
-        fun.scan_page(&tx, &bytes, 0);
-        let found: Vec<SearchResult> = rx.try_iter().collect();
-        assert_eq!(found.len(), 0);
-        Ok(())
+    #[test]
+    fn finds_gt() {
+        let needle: i64 = 625;
+        assert!(perform_search(&needle.to_ne_bytes(), " > 500 "));
+    }
+
+    #[test]
+    fn no_find() {
+        let needle: i32 = 625;
+        assert!(!perform_search(&needle.to_ne_bytes(), "9999 "));
+    }
+
+    #[test]
+    fn no_find_gt() {
+        let needle: i32 = 625;
+        assert!(!perform_search(&needle.to_ne_bytes(), " > 625"));
     }
 }
