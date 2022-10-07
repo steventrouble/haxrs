@@ -128,6 +128,13 @@ impl SearchTools {
                 if ui.button(label).clicked() {
                     self.scan(results, process);
                 }
+
+                if !results.results.is_empty() {
+                    if ui.button("Clear").clicked() {
+                        results.results_rx = None;
+                        results.results.clear();
+                    }
+                };
             });
         });
     }
