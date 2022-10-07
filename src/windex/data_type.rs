@@ -46,10 +46,6 @@ macro_rules! default_data_type_fns {
               _ => Err("Parse Error".to_string()),
           }
       }
-
-      fn display(&self, value: &[u8]) -> String {
-        format!("{:.5e}", <$tye>::from_ne_bytes(value.try_into().expect("Invalid size")))
-      }
   };
 }
 
@@ -70,6 +66,10 @@ impl DataTypeTrait for FourBytes {
       "4 bytes"
   }
 
+  fn display(&self, value: &[u8]) -> String {
+    format!("{}", i32::from_ne_bytes(value.try_into().expect("Invalid size")))
+  }
+
   default_data_type_fns!(i32);
 }
 
@@ -78,6 +78,10 @@ pub struct EightBytes;
 impl DataTypeTrait for EightBytes {
   fn name(&self) -> &str {
       "8 bytes"
+  }
+
+  fn display(&self, value: &[u8]) -> String {
+    format!("{}", i64::from_ne_bytes(value.try_into().expect("Invalid size")))
   }
 
   default_data_type_fns!(i64);
@@ -90,6 +94,15 @@ impl DataTypeTrait for Float {
       "Float"
   }
 
+  fn display(&self, value: &[u8]) -> String {
+    let val = f32::from_ne_bytes(value.try_into().expect("Invalid size"));
+    if val.log2() < 10.0 && val.log2() > -10.0 {
+      format!("{:.2}", val)
+    } else {
+      format!("{:e}", val)
+    }
+  }
+
   default_data_type_fns!(f32);
 }
 
@@ -98,6 +111,15 @@ pub struct Double;
 impl DataTypeTrait for Double {
   fn name(&self) -> &str {
       "Double"
+  }
+
+  fn display(&self, value: &[u8]) -> String {
+    let val = f64::from_ne_bytes(value.try_into().expect("Invalid size"));
+    if val.log2() < 10.0 && val.log2() > -10.0 {
+      format!("{:.2}", val)
+    } else {
+      format!("{:.2e}", val)
+    }
   }
 
   default_data_type_fns!(f64);
