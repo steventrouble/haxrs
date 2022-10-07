@@ -249,7 +249,6 @@ fn parse_float(val: pest::iterators::Pair<Rule>) -> Option<(f64, i32)> {
 
 /// Builds a matcher from a parsed search query.
 fn build_matcher(pair: pest::iterators::Pair<Rule>) -> Node {
-    println!("got {}", pair);
     match pair.as_rule() {
         Rule::Num => Node::Constant(ConstantMatcher {
             as_int: pair.as_str().parse::<i64>().ok(),
@@ -277,7 +276,6 @@ pub fn parse(input: &str) -> Result<Node, String> {
     let pairs = SearchParser::parse(Rule::SearchQuery, input);
     match pairs {
         Ok(pairs) => {
-            println!("Got {}", pairs);
             for pair in pairs {
                 return Ok(build_matcher(pair));
             }
