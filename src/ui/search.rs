@@ -8,7 +8,8 @@ use crate::parser;
 use crate::windex::scanner::SearchResult;
 use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
-use egui::Layout;
+use egui::{Layout, WidgetText};
+use egui_extras::{Size, TableRow};
 
 use super::{address_grid::UserAddress, AddressGrid};
 
@@ -67,21 +68,16 @@ impl SearchResults {
         }
 
         ui.vertical(|ui| {
+            // Progress
             let num_results = self.results.len();
             self.show_progress(ui, num_results);
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, true])
-                .min_scrolled_height(150.0)
-                .show(ui, |ui| {
-                    for (idx, result) in self.results.iter().take(1000).enumerate() {
-                        let addr = result.address;
-                        let data_type = result.data_type.info();
-                        let value = get_mem_cached(process, result.address, data_type.size_of())
-                            .map(|x| data_type.display(&x))
-                            .unwrap_or("???".to_string());
-                        ui.checkbox(&mut self.checked[idx], format!("{addr:x} - {value}"));
-                    }
-                });
+
+            // Results
+            if !self.results.is_empty() {
+                self.render_table(ui, process);
+            }
+
+            // Add button
             if ui.button("+ Add Selected").clicked() {
                 for (idx, checked) in self.checked.iter().enumerate() {
                     if *checked {
@@ -99,12 +95,38 @@ impl SearchResults {
         });
     }
 
+    /// Show the progress of the current search, if any.
     fn show_progress(&mut self, ui: &mut egui::Ui, num_results: usize) {
         if self.loading.load(Ordering::Relaxed) {
             ui.label(format!("Scanning - {num_results} results"));
         } else {
             ui.label(format!("{num_results} results"));
         }
+    }
+
+    /// Render the search results table
+    fn render_table(&mut self, ui: &mut egui::Ui, process: &Process) {
+        egui_extras::TableBuilder::new(ui)
+            .resizable(true)
+            .column(Size::relative(0.5).at_least(40.0))
+            .column(Size::relative(0.5).at_least(40.0))
+            .body(|mut body| {
+                for (idx, result) in self.results.iter().take(1000).enumerate() {
+                    body.row(20.0, |mut row| {
+                        let addr = result.address;
+                        let data_type = result.data_type.info();
+                        let value = get_mem_cached(process, result.address, data_type.size_of())
+                            .map(|x| data_type.display(&x))
+                            .unwrap_or("???".to_string());
+                        row.col(|ui| {
+                            ui.checkbox(&mut self.checked[idx], format!("{addr:x}"));
+                        });
+                        row.col(|ui| {
+                            ui.label(value);
+                        });
+                    })
+                }
+            });
     }
 }
 
