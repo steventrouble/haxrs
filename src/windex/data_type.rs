@@ -96,7 +96,7 @@ impl DataTypeTrait for Float {
 
   fn display(&self, value: &[u8]) -> String {
     let val = f32::from_ne_bytes(value.try_into().expect("Invalid size"));
-    if val.log2() < 10.0 && val.log2() > -10.0 {
+    if val.log2() < 16.0 && val.log2() > -16.0 {
       format!("{:.2}", val)
     } else {
       format!("{:e}", val)
@@ -115,7 +115,7 @@ impl DataTypeTrait for Double {
 
   fn display(&self, value: &[u8]) -> String {
     let val = f64::from_ne_bytes(value.try_into().expect("Invalid size"));
-    if val.log2() < 10.0 && val.log2() > -10.0 {
+    if val.log2() < 16.0 && val.log2() > -16.0 {
       format!("{:.2}", val)
     } else {
       format!("{:.2e}", val)
