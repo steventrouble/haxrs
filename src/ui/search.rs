@@ -19,6 +19,7 @@ pub struct Search {
 }
 
 impl Search {
+    /// Display the search results
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -42,11 +43,17 @@ impl Search {
     }
 }
 
+/// UI component that displays the list of search results and lets users add
+/// them to the address list.
 #[derive(Default)]
 struct SearchResults {
+    /// The list of search results.
     results: Vec<SearchResult>,
+    /// For each search result, whether or not the checkbox is checked.
     checked: Vec<bool>,
+    /// Emits values whenever a search result is found.
     results_rx: Option<Receiver<SearchResult>>,
+    /// True if the search is still loading.
     loading: Arc<AtomicBool>,
 }
 
