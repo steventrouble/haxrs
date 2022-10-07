@@ -1,11 +1,11 @@
 use std::sync::atomic::Ordering;
-use std::sync::{mpsc, atomic::AtomicBool};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, mpsc};
 use std::thread;
 
-use crate::windex::scanner::SearchResult;
 use crate::parser;
+use crate::windex::scanner::SearchResult;
 use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
 use egui::Layout;
@@ -37,7 +37,7 @@ impl Search {
             // Search results
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width());
-                self.results.show(ui, address_grid);
+                self.results.show(ui, address_grid, process);
             });
         });
     }
@@ -58,7 +58,7 @@ struct SearchResults {
 }
 
 impl SearchResults {
-    pub fn show(&mut self, ui: &mut egui::Ui, address_grid: &mut AddressGrid) {
+    pub fn show(&mut self, ui: &mut egui::Ui, address_grid: &mut AddressGrid, process: &Process) {
         if let Some(results_rx) = &self.results_rx {
             for r in results_rx.try_iter() {
                 self.results.push(r);
@@ -75,7 +75,10 @@ impl SearchResults {
                 .show(ui, |ui| {
                     for (idx, result) in self.results.iter().take(1000).enumerate() {
                         let addr = result.address;
-                        let value = result.value_to_string();
+                        let data_type = result.data_type.info();
+                        let value = get_mem_cached(process, result.address, data_type.size_of())
+                            .map(|x| data_type.display(&x))
+                            .unwrap_or("???".to_string());
                         ui.checkbox(&mut self.checked[idx], format!("{addr:x} - {value}"));
                     }
                 });
