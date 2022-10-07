@@ -1,3 +1,3 @@
 mod parser;
 
-pub use parser::{Node, parse};
+pub use parser::{parse, Node};

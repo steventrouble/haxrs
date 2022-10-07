@@ -266,7 +266,7 @@ fn build_matcher(pair: pest::iterators::Pair<Rule>) -> Node {
                 val = Box::new(build_matcher(first))
             }
             Node::MatchExpr { op, val }
-        },
+        }
         unknown => panic!("Unexpected syntax element {:?}.", unknown),
     }
 }

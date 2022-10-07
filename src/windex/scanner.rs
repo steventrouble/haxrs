@@ -2,7 +2,7 @@ use std::sync::{mpsc::Sender, Arc};
 
 use crate::parser::Node;
 
-use super::{Process, DataTypeEnum};
+use super::{DataTypeEnum, Process};
 
 const MAX_PAGE_BYTES: usize = 1 << 29; // 512 MiB
 

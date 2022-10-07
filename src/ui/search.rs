@@ -8,8 +8,8 @@ use crate::parser;
 use crate::windex::scanner::SearchResult;
 use crate::windex::{scanner, Process};
 use cached::proc_macro::cached;
-use egui::{Layout, WidgetText};
-use egui_extras::{Size, TableRow};
+use egui::Layout;
+use egui_extras::Size;
 
 use super::{address_grid::UserAddress, AddressGrid};
 
