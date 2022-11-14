@@ -28,8 +28,10 @@ impl Search {
         address_grid: &mut AddressGrid,
     ) {
         ui.heading("Search");
+        let available_height = ui.available_height();
         ui.horizontal(|ui| {
             // Search tools
+            ui.set_max_height(available_height / 3.0);
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() / 2.0);
                 self.tools.show(ui, &mut self.results, process);
