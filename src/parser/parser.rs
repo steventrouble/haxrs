@@ -1,8 +1,12 @@
 use std::{mem::size_of, sync::mpsc::Sender};
 
+use num_traits::Float;
 use pest::Parser;
 
 use crate::windex::{scanner::SearchResult, DataTypeEnum};
+
+/// The default search type to use when no comparator is specified.
+const DEFAULT_CMP: Comparator = Comparator::Approx;
 
 /// Parser that parses search queries using the grammar in search.pest.
 #[derive(pest_derive::Parser)]
@@ -19,6 +23,7 @@ pub struct ConstantMatcher {
 /// Represents a comparator to use. Values in memory will match if greater than the
 /// value that follows the comparator.
 pub enum Comparator {
+    Approx, // Default
     Gt,
     Gte,
     Lt,
@@ -30,6 +35,7 @@ pub enum Comparator {
 impl Comparator {
     pub fn matches_int<T: PartialOrd>(&self, mem: T, val: T) -> bool {
         match self {
+            Comparator::Approx => mem == val,
             Comparator::Eq => mem == val,
             Comparator::Neq => mem != val,
             Comparator::Gt => mem > val,
@@ -39,9 +45,10 @@ impl Comparator {
         }
     }
 
-    pub fn matches_float<T: PartialOrd>(&self, mem: T, val: T, lower: T, upper: T) -> bool {
+    pub fn matches_float<T: Float>(&self, mem: T, val: T, lower: T, upper: T) -> bool {
         match self {
-            Comparator::Eq => mem > lower && mem < upper,
+            Comparator::Approx => mem > lower && mem < upper,
+            Comparator::Eq => mem >= val - T::min_value() && mem <= val + T::min_value(),
             Comparator::Neq => mem < lower || mem > upper,
             Comparator::Gt => mem > val,
             Comparator::Gte => mem >= val,
@@ -58,6 +65,7 @@ impl Comparator {
             "<=" => Comparator::Lte,
             "=" => Comparator::Eq,
             "!=" => Comparator::Neq,
+            "~" => Comparator::Approx,
             "" => Comparator::Eq,
             unknown => panic!("Unknown operator {}.", unknown),
         }
@@ -82,7 +90,7 @@ impl Node {
     /// Scans an entire page of memory for things that match.
     pub fn scan_page(&self, tx: &Sender<SearchResult>, mem: &[u8], addr_start: usize) {
         match self {
-            Node::Constant(matcher) => scan_page(tx, mem, addr_start, &Comparator::Eq, matcher),
+            Node::Constant(matcher) => scan_page(tx, mem, addr_start, &DEFAULT_CMP, matcher),
             Node::MatchExpr { op, val } => scan_page(tx, mem, addr_start, op, val.as_constant()),
         }
     }
@@ -90,7 +98,7 @@ impl Node {
     /// Compares a single value against this matcher.
     pub fn test_single(&self, mem: &[u8], data_type: DataTypeEnum) -> bool {
         match self {
-            Node::Constant(matcher) => compare_single(mem, data_type, &Comparator::Eq, matcher),
+            Node::Constant(matcher) => compare_single(mem, data_type, &DEFAULT_CMP, matcher),
             Node::MatchExpr { op, val } => compare_single(mem, data_type, op, val.as_constant()),
         }
     }
@@ -257,7 +265,7 @@ fn build_matcher(pair: pest::iterators::Pair<Rule>) -> Node {
         Rule::MatchExpr => {
             let mut pair = pair.into_inner();
             let first = pair.next().unwrap();
-            let mut op = Comparator::Eq;
+            let mut op = Comparator::Approx;
             let val: Box<Node>;
             if first.as_rule() == Rule::Comparator {
                 op = Comparator::from_str(first.as_str());

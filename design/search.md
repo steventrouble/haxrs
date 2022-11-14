@@ -24,7 +24,8 @@ Create a textual query language that can be used to scan memory.
 
 | Type | Example | Notes |
 | ---- | ------- | ----- |
-| Equivalence | `652` (or `=652`) | Floats compare within $\epsilon$
+| Approx | `652` or `~652` | Floats compare within significant figures |
+| Exact | `=652` | Exact comparison, floats compare within epsilon |
 | Comparator | `>=625` |
 | Within range | `0 .. 5.3e5` |
 | Is valid pointer | `is ptr` |
