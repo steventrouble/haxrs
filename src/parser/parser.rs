@@ -112,68 +112,72 @@ fn scan_page(
     op: &Comparator,
     values: &ConstantMatcher,
 ) {
-    if let Some(value) = values.as_int {
-        for (i, &v) in bytemuck::try_cast_slice::<u8, i64>(mem)
-            .unwrap_or(&[])
-            .iter()
-            .enumerate()
-        {
-            if op.matches_int(v, value) {
-                let result = SearchResult {
-                    address: i * size_of::<i64>() + addr_start,
-                    data_type: DataTypeEnum::EightBytes,
-                    value: v.to_ne_bytes().to_vec(),
-                };
-                tx.send(result).unwrap();
+    // Cast the memory into 4-byte word arrays
+    let i32_arr = bytemuck::try_cast_slice::<u8, i32>(mem).unwrap_or(&[]);
+    let f32_arr = bytemuck::try_cast_slice::<u8, f32>(mem).unwrap_or(&[]);
+    // And 8-byte dword arrays
+    let i64_arr = bytemuck::try_cast_slice::<u8, i64>(mem).unwrap_or(&[]);
+    let f64_arr = bytemuck::try_cast_slice::<u8, f64>(mem).unwrap_or(&[]);
+    let num_words = i32_arr.len();
+
+    // Loop over each entry and compare it to the search value
+    for i32_offset in 0..num_words {
+        let i64_offset = i32_offset / 2;
+
+        if let Some(value) = values.as_int {
+            // i64
+            if i32_offset % 2 == 0 {
+                let v = i64_arr[i64_offset];
+                if op.matches_int(v, value) {
+                    let result = SearchResult {
+                        address: i64_offset * size_of::<i64>() + addr_start,
+                        data_type: DataTypeEnum::EightBytes,
+                        value: v.to_ne_bytes().to_vec(),
+                    };
+                    tx.send(result).unwrap();
+                }
             }
-        }
-        let value = value as i32;
-        for (i, &v) in bytemuck::try_cast_slice::<u8, i32>(mem)
-            .unwrap_or(&[])
-            .iter()
-            .enumerate()
-        {
+
+            // i32
+            let value = value as i32;
+            let v = i32_arr[i32_offset];
             if op.matches_int(v, value) {
                 let result = SearchResult {
-                    address: i * size_of::<i32>() + addr_start,
+                    address: i32_offset * size_of::<i32>() + addr_start,
                     data_type: DataTypeEnum::FourBytes,
                     value: v.to_ne_bytes().to_vec(),
                 };
                 tx.send(result).unwrap();
             }
         }
-    }
 
-    if let Some((value, decimal_digits)) = values.as_float {
-        let lowest_digit = (10.0 as f64).powf(-(decimal_digits as f64));
-        let lower_bound = value - lowest_digit * 0.999;
-        let upper_bound = value + lowest_digit * 0.999;
-        for (i, &v) in bytemuck::try_cast_slice::<u8, f64>(mem)
-            .unwrap_or(&[])
-            .iter()
-            .enumerate()
-        {
-            if op.matches_float(v, value, lower_bound, upper_bound) {
-                let result = SearchResult {
-                    address: i * size_of::<f64>() + addr_start,
-                    data_type: DataTypeEnum::Double,
-                    value: v.to_ne_bytes().to_vec(),
-                };
-                tx.send(result).unwrap();
+        if let Some((value, decimal_digits)) = values.as_float {
+            // f64
+            let lowest_digit = (10.0 as f64).powf(-(decimal_digits as f64));
+            if (i32_offset % 2) == 0 {
+                let f64_offset = i32_offset / 2;
+                let lower_bound = value - lowest_digit * 0.999;
+                let upper_bound = value + lowest_digit * 0.999;
+                let v = f64_arr[f64_offset];
+                if op.matches_float(v, value, lower_bound, upper_bound) {
+                    let result = SearchResult {
+                        address: f64_offset * size_of::<f64>() + addr_start,
+                        data_type: DataTypeEnum::Double,
+                        value: v.to_ne_bytes().to_vec(),
+                    };
+                    tx.send(result).unwrap();
+                }
             }
-        }
-        let value = value as f32;
-        let lowest_digit = lowest_digit as f32;
-        let lower_bound = value - lowest_digit;
-        let upper_bound = value + lowest_digit;
-        for (i, &v) in bytemuck::try_cast_slice::<u8, f32>(mem)
-            .unwrap_or(&[])
-            .iter()
-            .enumerate()
-        {
+
+            // f32
+            let value = value as f32;
+            let lowest_digit = lowest_digit as f32;
+            let lower_bound = value - lowest_digit;
+            let upper_bound = value + lowest_digit;
+            let v = f32_arr[i32_offset];
             if op.matches_float(v, value, lower_bound, upper_bound) {
                 let result = SearchResult {
-                    address: i * size_of::<f32>() + addr_start,
+                    address: i32_offset * size_of::<f32>() + addr_start,
                     data_type: DataTypeEnum::Float,
                     value: v.to_ne_bytes().to_vec(),
                 };
